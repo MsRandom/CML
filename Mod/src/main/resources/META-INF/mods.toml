@@ -1,0 +1,16 @@
+modLoader="javafml"
+loaderVersion="[28,)"
+[[mods]]
+modId="cml"
+version="${file.jarVersion}"
+displayName="Competitive Modelers League"
+credits="" #o
+authors="" #o
+description='''
+'''
+[[dependencies.cml]]
+    modId="forge"
+    mandatory=true
+    versionRange="[28,)"
+    ordering="NONE"
+    side="BOTH"
