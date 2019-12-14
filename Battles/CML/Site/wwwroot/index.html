@@ -2,9 +2,48 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Home</title>
 </head>
 <body>
-<h1>Hello</h1>
+<script>
+    function openMatches() {
+        document.querySelector("#matches").setAttribute("hidden", "hidden");
+        document.querySelector("#submits").setAttribute("hidden", "hidden");
+        document.querySelector("#control").removeAttribute("hidden");
+        document.querySelector("#cancel").removeAttribute("hidden");
+        document.querySelector("#token").removeAttribute("hidden");
+    }
+
+    function closeMatches() {
+        document.querySelector("#matches").removeAttribute("hidden");
+        document.querySelector("#submits").removeAttribute("hidden");
+        document.querySelector("#control").setAttribute("hidden", "hidden");
+        document.querySelector("#cancel").setAttribute("hidden", "hidden");
+        document.querySelector("#token").setAttribute("hidden", "hidden");
+        document.querySelector("#error").setAttribute("hidden", "hidden");
+    }
+    
+    async function openControls() {
+        const resp = await fetch("validateToken", {
+            method: "post",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({token: document.querySelector("#token").firstElementChild.value})
+        });
+        const result = await resp.json();
+        if(result.valid) location.replace("battles/matches");
+        else document.querySelector("#error").removeAttribute("hidden");
+    }
+</script>
+<button id="matches" onclick="openMatches()">Matches</button>
+<button id="submits" onclick="location.replace('battles/submit')">Submit</button>
+<span hidden id="error" style="color: red; font-weight: bold">Token is invalid.</span>
+<label hidden id="token">
+    Please enter Admin token:
+    <input type="text"/>
+</label>
+<button hidden id="control" onclick="openControls()">Submit</button>
+<button hidden id="cancel" onclick="closeMatches()">Cancel</button>
 </body>
 </html>

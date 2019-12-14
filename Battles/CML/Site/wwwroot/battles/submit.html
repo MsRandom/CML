@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Submit</title>
+</head>
+<body>
+<script>
+    function updatePoints() {
+        let values = ["attack", "defence", "speed"];
+        let sum = 0;
+        for (let value of values) {
+            let int = parseInt(document.querySelector("#" + value).value);
+            sum += isNaN(int) ? 0 : int;
+        }
+        document.querySelector("#points").innerHTML = (sum) + "/" + (100) + " Points (" + (100 - sum) + " left)";
+        if(sum > 100) document.querySelector("#submit").setAttribute("disabled", "disabled");
+        else document.querySelector("#submit").removeAttribute("disabled");
+    }
+    
+    function submitEntry() {
+        
+    }
+</script>
+<p id="points">0/100 Points (100 left)</p>
+<label id="properties">
+    Properties:
+    Attack:
+    <input oninput="updatePoints()" id="attack" type="number"/>
+    Defence:
+    <input oninput="updatePoints()" id="defence" type="number"/>
+    Speed:
+    <input oninput="updatePoints()" id="speed" type="number"/>
+</label>
+<button onclick="submitEntry()" id="submit">Submit</button>
+</body>
+</html>

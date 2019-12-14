@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -71,7 +72,45 @@ namespace CML.Site
 
         private void AssignEndpoints()
         {
-            //
+            SetEndpoint("validateToken", (s, o) =>
+            {
+                dynamic res = new JObject();
+                res.valid = o.token == Program.ParsedArgs["token"];
+                return res.ToString();
+            });
+            SetEndpoint("getBattles", (s, o) =>
+            {
+                dynamic res = new JObject();
+                res.contestants = new JArray();
+                res.battles = new JArray();
+                foreach (var submission in Program.Matches.Submissions) res.contestants.Add(submission);
+                foreach (var (item1, item2) in Program.Matches.Battles)
+                {
+                    dynamic obj = new JObject();
+                    obj.item1 = item1;
+                    obj.item2 = item2;
+                    res.battles.Add(obj);
+                }
+                return res.ToString();
+            });
+            SetEndpoint("submit", (s, o) =>
+            {
+                dynamic res = new JObject();
+                if (o.speed + o.attack + o.defence <= 100)
+                {
+                    Program.Matches.Submissions.Add(o);
+                    res.success = true;
+                }
+                else res.success = false;
+                return res.ToString();
+            });
+        }
+        
+        private void SetEndpoint(string name, Func<string, dynamic, string> action)
+        {
+            var path = _index;
+            foreach (var s in name.Split('/')) if (path.Children.ContainsKey(s)) path = path.Children[s];
+            path.Data = action;
         }
 
         public async Task HandleRequest(HttpListenerRequest req, HttpListenerResponse resp)

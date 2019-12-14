@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using CML.Battles;
 using CML.Bot;
 using CML.Site;
 
@@ -9,6 +10,7 @@ namespace CML
     internal static class Program
     {
         public static readonly Dictionary<string, string> ParsedArgs = new Dictionary<string, string>();
+        public static readonly MatchManager Matches = new MatchManager();
         private static CmlListener _listener;
         private static CmlListener _discord;
         
