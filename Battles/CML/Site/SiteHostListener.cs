@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -8,38 +9,27 @@ namespace CML.Site
     public sealed class SiteHostListener : CmlListener
     {
         private HttpListener _listener;
+        private readonly HttpRequestHandlers _handler;
         private readonly string _url;
-        private readonly string _data;
+        private bool _listening;
 
-        public SiteHostListener(FileInfo html, string url)
+        public SiteHostListener(string url)
         {
-            _data = html.OpenText().ReadToEnd();
+            _handler = new HttpRequestHandlers(new FileInfo(Program.ParsedArgs["wwwroot"] + "/endpoints.json"));
             _url = url;
         }
         
-        private void HandleConnections()
+        private void HandleConnections(IAsyncResult result)
         {
             Task.Run(async () =>
             {
-                while (true)
+                while (_listening)
                 {
-                    var ctx = await _listener.GetContextAsync();
-                    //var req = ctx.Request;
+                    var ctx = _listener.EndGetContext(result);
+                    _listener.BeginGetContext(HandleConnections, null);
+                    var req = ctx.Request;
                     var resp = ctx.Response;
-                    //TODO handle http requests
-                    var data = Encoding.UTF8.GetBytes(_data);
-                    resp.ContentType = "text/html";
-                    resp.ContentEncoding = Encoding.UTF8;
-                    resp.ContentLength64 = data.LongLength;
-                    await resp.OutputStream.WriteAsync(data, 0, data.Length);
-                    //for future error handling
-                    const bool error = false;
-                    if (error)
-                    {
-                        break;
-                    }
-
-                    resp.Close();
+                    await _handler.HandleRequest(req, resp);
                 }
             });
         }
@@ -49,7 +39,18 @@ namespace CML.Site
             _listener = new HttpListener();
             _listener.Prefixes.Add(_url);
             _listener.Start();
-            HandleConnections();
+            _listener.BeginGetContext(HandleConnections, null);
+            _listening = true;
+            Console.WriteLine("Listening to connections on " + _url);
+        }
+
+        public override void Close()
+        {
+            _listener.Close();
+            _listener.Prefixes.Clear();
+            _listener = null;
+            _listening = false;
+            Console.WriteLine("Site listener has been stopped.");
         }
     }
 }

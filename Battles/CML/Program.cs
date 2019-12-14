@@ -8,17 +8,17 @@ namespace CML
 {
     internal static class Program
     {
+        public static readonly Dictionary<string, string> ParsedArgs = new Dictionary<string, string>();
         private static CmlListener _listener;
         private static CmlListener _discord;
         
         private static async Task Main(string[] args)
         {
-            var parsedArgs = new Dictionary<string, string>();
-            foreach (var s in args) parsedArgs[s.Substring(0, s.IndexOf('='))] = s.Substring(s.IndexOf('=') + 1);
+            foreach (var s in args) ParsedArgs[s.Substring(0, s.IndexOf('='))] = s.Substring(s.IndexOf('=') + 1);
             var port = "8080";
-            if (parsedArgs.ContainsKey("port")) port = parsedArgs["port"];
-            if(parsedArgs.ContainsKey("wwwroot")) _listener = new SiteHostListener(new FileInfo(parsedArgs["wwwroot"] + "/index.html"), $"http://localhost:{port}/");
-            if(parsedArgs.ContainsKey("token")) _discord = new DiscordBotListener(parsedArgs["token"]);
+            if (ParsedArgs.ContainsKey("port")) port = ParsedArgs["port"];
+            if(ParsedArgs.ContainsKey("wwwroot")) _listener = new SiteHostListener($"http://localhost:{port}/");
+            if(ParsedArgs.ContainsKey("token")) _discord = new DiscordBotListener(ParsedArgs["token"]);
             _listener?.Listen();
             _discord?.Listen();
             await Task.Delay(-1);

@@ -7,23 +7,32 @@ namespace CML.Bot
 {
     public sealed class DiscordBotListener : CmlListener
     {
-        private readonly DiscordSocketClient _client;
         private readonly string _token;
+        private DiscordSocketClient _client;
 
         public DiscordBotListener(string token)
+        {
+            _token = token;
+        }
+        
+        public override async void Listen()
         {
             _client = new DiscordSocketClient();
             //logs are annoying
             //_client.Log += LogAsync;
             _client.Ready += ReadyAsync;
             _client.MessageReceived += MessageReceivedAsync;
-            _token = token;
-        }
-        
-        public override async void Listen()
-        {
             await _client.LoginAsync(TokenType.Bot, _token);
             await _client.StartAsync();
+            Console.WriteLine("Discord client started.");
+        }
+        
+        public override async void Close()
+        {
+            await _client.LogoutAsync();
+            await _client.StopAsync();
+            _client = null;
+            Console.WriteLine("Discord client stopped.");
         }
 
         /*private static Task LogAsync(LogMessage log)
