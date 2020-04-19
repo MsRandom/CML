@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<!--suppress HtmlUnknownTarget -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Matches</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+<img id="logo" src="../assets/header.png" alt="CML">
+<div id="menu-button" onclick="openMenu()" class="div-button">
+    <div></div>
+</div>
+<div id="matches-container">
+    <button id="save-matches" onclick="save()">Save</button>
+    <button id="reset-matches" onclick="reset()">Reset Changes</button>
+    <div id="menu">
+        <div id="close-menu" class="div-button" onclick="closeMenu()"></div>
+        <div class="menu-option" onclick="closeMenu(); openMatches();"><a href="../">Home</a></div>
+        <div class="menu-option" onclick="location.href = 'battles/submit'">
+            <a href="submit">Submit</a>
+        </div>
+        <div class="menu-option" onclick="location.href = 'battles/fame'">
+            <a href="fame">Hall of Fame</a>
+        </div>
+    </div>
+</div>
+<!--suppress JSUnresolvedVariable -->
+<script>
+    const arr = [];
+    const battles = [];
+    let secretToken;
+
+    function openMenu() {
+        document.querySelector("#menu").style.width = "15%";
+    }
+
+    function closeMenu() {
+        document.querySelector("#menu").style.width = "0";
+    }
+
+    async function save() {
+        const ret = [];
+        for (const match of arr) {
+            const left = match.firstElementChild.id;
+            const right = match.firstElementChild.id;
+            ret.push([left ? left : null, right ? right : null]);
+        }
+        await fetch("updateMatches", {
+            method: "post",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": secretToken
+            },
+            body: JSON.stringify({updated: ret})
+        });
+    }
+
+    async function reset() {
+        const resp = await fetch("getBattles", {
+            method: "get",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        });
+        const result = await resp.json();
+        for (let i = 0; i < result.battles.length; i++) {
+            const battle = result.battles[i];
+            const match = arr[i];
+            if (battle.left) {
+                const b = match.firstElementChild;
+                const selection = b.firstElementChild;
+                const img = selection.lastElementChild;
+                const contestant = result.contestants[battle.left];
+                selection.id = battle.left;
+                b.id = battle.left;
+                img.src =  "../assets/elements/" + contestant.element.toLowerCase() + ".png";
+                img.alt = contestant.name;
+            } else {
+                const b = match.firstElementChild;
+                const selection = b.firstElementChild;
+                const img = selection.lastElementChild;
+                selection.id = "";
+                b.id = "";
+                img.src =  "";
+                img.alt = "";
+            }
+            if (battle.right) {
+                const b = match.lastElementChild;
+                const selection = b.firstElementChild;
+                const img = selection.lastElementChild;
+                const contestant = result.contestants[battle.right];
+                selection.id = battle.right;
+                b.id = battle.left;
+                img.src =  "../assets/elements/" + contestant.element.toLowerCase() + ".png";
+                img.alt = contestant.name;
+            } else {
+                const b = match.lastElementChild;
+                const selection = b.firstElementChild;
+                const img = selection.lastElementChild;
+                selection.id = "";
+                b.id = "";
+                img.src =  "";
+                img.alt = "";
+            }
+        }
+    }
+
+    async function setup() {
+        const container = document.querySelector("#matches-container");
+        secretToken = document.cookie.replace(/(?:(?:^|.*;\s*)Client-Token\s*=\s*([^;]*).*$)|^.*$/, "$1");
+        secretToken = secretToken.substring(secretToken.indexOf("/") + 1);
+        const create = () => {
+            const div = document.createElement("DIV");
+            const selections = document.createElement("DIV");
+            const selected = document.createElement("DIV");
+            const selectedImg = document.createElement("DIV");
+            const img = document.createElement("IMG");
+            img.style.width = "48px";
+            img.style.height = "48px";
+            img.alt = "";
+            img.src = "";
+            selected.innerHTML = "Competitor";
+            selections.hidden = true;
+            selectedImg.appendChild(img);
+            selections.appendChild(selected);
+            div.appendChild(selectedImg);
+            div.appendChild(selections);
+            selectedImg.addEventListener("click", () => {
+                const old = !selections.hidden;
+                for (const s of battles) s.lastElementChild.hidden = true;
+                selections.hidden = old;
+            });
+            div.className = "battle";
+            selections.className = "selections";
+            battles.push(div);
+            return div;
+        };
+        for (let i = 0; i < 4; i++) {
+            const div = document.createElement("DIV");
+            const vs = document.createElement("P");
+            vs.innerHTML = "VS";
+            div.appendChild(create());
+            div.appendChild(vs);
+            div.appendChild(create());
+            div.style.gridColumnStart = (2 + i).toString();
+            div.style.gridColumnEnd = (3 + i).toString();
+            div.style.gridRowStart = "2";
+            div.style.gridRowEnd = "3";
+            div.className = "match";
+            arr.push(div);
+            container.appendChild(div);
+        }
+
+        const resp = await fetch("getBattles", {
+            method: "get",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        });
+        const result = await resp.json();
+        for (let i = 0; i < result.battles.length; i++) {
+            const battle = result.battles[i];
+            const match = arr[i];
+            if (battle.left) {
+                const b = match.firstElementChild;
+                const selection = b.firstElementChild;
+                const img = selection.lastElementChild;
+                const contestant = result.contestants[battle.left];
+                selection.id = battle.left;
+                b.id = battle.left;
+                img.src =  "../assets/elements/" + contestant.element.toLowerCase() + ".png";
+                img.alt = contestant.name;
+            }
+            if (battle.right) {
+                const b = match.lastElementChild;
+                const selection = b.firstElementChild;
+                const img = selection.lastElementChild;
+                const contestant = result.contestants[battle.right];
+                selection.id = battle.right;
+                b.id = battle.left;
+                img.src =  "../assets/elements/" + contestant.element.toLowerCase() + ".png";
+                img.alt = contestant.name;
+            }
+        }
+        for (const battle of battles) {
+            for (const id in result.contestants) {
+                if (result.contestants.hasOwnProperty(id)) {
+                    const div = document.createElement("DIV");
+                    const contestant = result.contestants[id];
+                    div.innerHTML = contestant.name;
+                    div.id = id;
+                    div.addEventListener("click", () => {
+                        battle.id = id;
+                        const contestant = result.contestants[id];
+                        const img = battle.firstElementChild.lastElementChild;
+                        img.src =  "../assets/elements/" + contestant.element.toLowerCase() + ".png";
+                        img.alt = contestant.name;
+                        battle.lastElementChild.hidden = true;
+                    });
+                    battle.lastElementChild.appendChild(div);
+                }
+            }
+        }
+    }
+
+    setup();
+</script>
+</body>
+</html>

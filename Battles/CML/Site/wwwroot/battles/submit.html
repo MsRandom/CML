@@ -1,37 +1,49 @@
 <!DOCTYPE html>
+<!--suppress HtmlUnknownTarget -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Submit</title>
+    <link rel="stylesheet" href="../assets/styles.css">
 </head>
 <body>
-<script>
-    function updatePoints() {
-        let values = ["attack", "defence", "speed"];
-        let sum = 0;
-        for (let value of values) {
-            let int = parseInt(document.querySelector("#" + value).value);
-            sum += isNaN(int) ? 0 : int;
+<img id="logo" src="../assets/header.png" alt="CML">
+<div id="menu-button" onclick="openMenu()" class="div-button">
+    <div></div>
+</div>
+<div id="container">
+    <button id="finish-submit" onclick="location.href = 'create'">
+        <a href="create">Finish Submission</a>
+    </button>
+    <span id="submit-info" hidden>First, click on the Apply button and make an application, after you finish your model, click on the Finish Submission button and fill out the needed info.</span>
+    <button id="info" onclick="openInfo()">Info</button>
+    <button id="apply" onclick="location.href = 'applications'">
+        <a href="applications">Apply</a>
+    </button>
+    <div id="menu">
+        <div id="close-menu" class="div-button" onclick="closeMenu()"></div>
+        <div class="menu-option" onclick="location.href = '../'">
+            <a href="../">Home</a>
+        </div>
+        <div class="menu-option" onclick="closeMenu()">Submit</div>
+        <div class="menu-option" onclick="location.href = 'fame'">
+            <a href="fame">Hall of Fame</a>
+        </div>
+    </div>
+    <script>
+        function openInfo() {
+            document.querySelector("#submit-info").removeAttribute("hidden");
+            document.querySelector("#info").setAttribute("hidden", "hidden");
         }
-        document.querySelector("#points").innerHTML = (sum) + "/" + (100) + " Points (" + (100 - sum) + " left)";
-        if(sum > 100) document.querySelector("#submit").setAttribute("disabled", "disabled");
-        else document.querySelector("#submit").removeAttribute("disabled");
-    }
-    
-    function submitEntry() {
-        
-    }
-</script>
-<p id="points">0/100 Points (100 left)</p>
-<label id="properties">
-    Properties:
-    Attack:
-    <input oninput="updatePoints()" id="attack" type="number"/>
-    Defence:
-    <input oninput="updatePoints()" id="defence" type="number"/>
-    Speed:
-    <input oninput="updatePoints()" id="speed" type="number"/>
-</label>
-<button onclick="submitEntry()" id="submit">Submit</button>
+
+        function openMenu() {
+            document.querySelector("#menu").style.width = "15%";
+        }
+
+        function closeMenu() {
+            document.querySelector("#menu").style.width = "0";
+        }
+    </script>
+</div>
 </body>
 </html>

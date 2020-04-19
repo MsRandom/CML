@@ -1,8 +1,0 @@
-{
-  "validateToken": {
-    "endpoint": "true"
-  },
-  "getBattles": {
-    "endpoint": "true"
-  }
-}

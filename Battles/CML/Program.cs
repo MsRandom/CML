@@ -4,25 +4,28 @@ using System.Threading.Tasks;
 using CML.Battles;
 using CML.Bot;
 using CML.Site;
+using Newtonsoft.Json;
 
 namespace CML
 {
     internal static class Program
     {
-        public static readonly Dictionary<string, string> ParsedArgs = new Dictionary<string, string>();
+        public static readonly List<CmlListener> ActiveListeners = new List<CmlListener>();
         public static readonly MatchManager Matches = new MatchManager();
-        private static CmlListener _listener;
-        private static CmlListener _discord;
+        public static CmlConfig Config = new CmlConfig();
+        public static SiteHostListener Listener;
+        public static DiscordBotListener Discord;
         
         private static async Task Main(string[] args)
         {
-            foreach (var s in args) ParsedArgs[s.Substring(0, s.IndexOf('='))] = s.Substring(s.IndexOf('=') + 1);
-            var port = "8080";
-            if (ParsedArgs.ContainsKey("port")) port = ParsedArgs["port"];
-            if(ParsedArgs.ContainsKey("wwwroot")) _listener = new SiteHostListener($"http://localhost:{port}/");
-            if(ParsedArgs.ContainsKey("token")) _discord = new DiscordBotListener(ParsedArgs["token"]);
-            _listener?.Listen();
-            _discord?.Listen();
+            string config;
+            if (args.Length > 0) 
+                config = args[0];
+            else
+                config = nameof(config) + ".json";
+            Config = JsonConvert.DeserializeObject<CmlConfig>(new FileInfo(config).OpenText().ReadToEnd());
+            Startup.Run();
+            ActiveListeners.ForEach(l => l.Listen());
             await Task.Delay(-1);
         }
     }

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!--suppress HtmlUnknownTarget -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Apply</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+<div id="menu-button" onclick="openMenu()" class="div-button">
+    <div></div>
+</div>
+<div id="container">
+    <p id="response">Select your Discord username, and create a password.</p>
+    <div id="dropdown">
+        <label>
+            <input type="text" placeholder="Username" id="user-filter"
+                   onclick="if(document.querySelector('#users').hidden) showUsers(); else hideUsers();">
+        </label>
+        <div id="users" hidden>
+            <div class="selected">Username</div>
+        </div>
+    </div>
+    <label id="password-label"><input type="password" placeholder="Password" id="password"></label>
+    <button onclick="apply()" id="confirmation">Confirm</button>
+    <div id="menu">
+        <div id="close-menu" class="div-button" onclick="closeMenu()"></div>
+        <div class="menu-option" onclick="location.href = '../'">
+            <a href="../">Home</a>
+        </div>
+        <div class="menu-option" onclick="location.href = 'submit'">
+            <a href="submit">Submit</a>
+        </div>
+        <div class="menu-option" id="02934" onclick="location.href = 'fame'">
+            <a href="fame">Hall of Fame</a>
+        </div>
+    </div>
+    <script>
+        let waiting = false;
+
+        async function apply() {
+            const res = document.querySelector("#response");
+            const users = document.querySelector("#users");
+            const password = document.querySelector("#password");
+            if (!password.value || !users.className)
+                return res.innerHTML = "Please select both your username and password";
+            const resp = await fetch("apply", {
+                method: "post",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    user: users.className,
+                    password: password.value
+                })
+            });
+            const response = await resp.json();
+            if (waiting) {
+                switch (response.result) {
+                    case "success-added":
+                        res.innerHTML = `Applied successfully!
+                        Your ID is <span style="color:cyan; font-style: italic">${response.id}</span>.
+                        Do <span style="color:red; font-weight: bold">NOT</span> share this ID with anyone.`;
+                        waiting = false;
+                        break;
+                    default:
+                    case "failed":
+                        res.innerHTML = "Failed to confirm.";
+                        break;
+                }
+            } else {
+                switch (response.result) {
+                    case "success":
+                        res.innerHTML = "Please confirm your application by using the bot in the Discord server, then click on the confirm button again";
+                        waiting = true;
+                        break;
+                    case "filled":
+                        res.innerHTML = "Sorry, but it appears there is already 8 applicants, please try again next week.";
+                        break;
+                    default:
+                    case "failed":
+                        res.innerHTML = "Failed to apply...";
+                        break;
+                }
+            }
+        }
+
+        function openMenu() {
+            document.querySelector("#menu").style.width = "15%";
+        }
+
+        function closeMenu() {
+            document.querySelector("#menu").style.width = "0";
+        }
+
+        function showUsers() {
+            document.querySelector("#users").removeAttribute("hidden");
+        }
+
+        function hideUsers() {
+            document.querySelector("#users").setAttribute("hidden", "hidden");
+        }
+
+        function filterUsers(event) {
+            if (event.code !== "Enter") {
+                const input = document.querySelector("#user-filter");
+                const div = document.querySelector("#users");
+                const users = div.querySelectorAll("#users div");
+                const text = input.value + event.key;
+                users.forEach(user => {
+                    if (!user.innerHTML.includes("Username") && (!text || user.className.includes("selected") || user.innerHTML.toLowerCase().includes(text.toLowerCase())))
+                        user.style.display = "block";
+                    else
+                        user.style.display = "none";
+                });
+            }
+        }
+
+        function keyControl(e) {
+            const element = document.querySelector("#users");
+            if (!element.hidden) {
+                const filter = document.querySelector("#user-filter");
+                if (e.code === "ArrowDown") {
+                    let index = indexOfChild(element);
+                    if (index < element.childNodes.length - 1) {
+                        setSelected(element, filter, element.childNodes[index + (index === 0 ? 2 : 1)], element.childNodes[index]);
+                    }
+                } else if (e.code === "ArrowUp") {
+                    let index = indexOfChild(element);
+                    if (index > 2) {
+                        setSelected(element, filter, element.childNodes[index - 1], element.childNodes[index]);
+                    }
+                } else if (e.code === "Enter") {
+                    hideUsers()
+                }
+            }
+        }
+
+        function indexOfChild(users) {
+            for (let i = 0; i < users.childNodes.length; i++) {
+                if (users.childNodes[i].className && users.childNodes[i].className.includes("selected")) return i;
+            }
+            return -1;
+        }
+
+        function setSelected(element, filter, child, old) {
+            if (old) {
+                old.className = "";
+            } else {
+                if (element.className) document.getElementById(element.className).className = "";
+                else element.firstElementChild.className = "";
+            }
+            if (child.id) {
+                element.className = child.id;
+                filter.placeholder = child.innerHTML;
+            }
+            filter.value = "";
+            child.className = "selected";
+        }
+
+        async function setUsers() {
+            const filter = document.querySelector("#user-filter");
+            const element = document.querySelector("#users");
+            const container = document.querySelector("#container");
+            filter.addEventListener("keypress", filterUsers);
+            container.addEventListener("keyup", keyControl);
+            const resp = await fetch("getUsers", {
+                method: "get",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
+            const result = await resp.json();
+            result.sort((a, b) => a.name > b.name ? 1 : a.name < b.name ? -1 : 0);
+            for (const user of result) {
+                const child = document.createElement("DIV");
+                child.id = user.user;
+                child.innerHTML = user.name;
+                child.addEventListener("click", () => {
+                    setSelected(element, filter, child);
+                    hideUsers();
+                });
+                element.appendChild(child);
+            }
+        }
+
+        setUsers();
+    </script>
+</div>
+</body>
+</html>

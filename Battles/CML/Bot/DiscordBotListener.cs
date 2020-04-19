@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Discord;
 using Discord.WebSocket;
@@ -8,30 +10,37 @@ namespace CML.Bot
     public sealed class DiscordBotListener : CmlListener
     {
         private readonly string _token;
-        private DiscordSocketClient _client;
+        public DiscordSocketClient Client;
 
-        public DiscordBotListener(string token)
+        public DiscordBotListener(string token, DiscordSocketClient client)
         {
             _token = token;
+            Client = client;
         }
         
         public override async void Listen()
         {
-            _client = new DiscordSocketClient();
             //logs are annoying
             //_client.Log += LogAsync;
-            _client.Ready += ReadyAsync;
-            _client.MessageReceived += MessageReceivedAsync;
-            await _client.LoginAsync(TokenType.Bot, _token);
-            await _client.StartAsync();
+            if (Client != null)
+            {
+                Client.Ready += ReadyAsync;
+                await Client.LoginAsync(TokenType.Bot, _token);
+                await Client.StartAsync();
+            }
+
             Console.WriteLine("Discord client started.");
         }
         
         public override async void Close()
         {
-            await _client.LogoutAsync();
-            await _client.StopAsync();
-            _client = null;
+            if (Client != null)
+            {
+                await Client.LogoutAsync();
+                await Client.StopAsync();
+            }
+
+            Client = null;
             Console.WriteLine("Discord client stopped.");
         }
 
@@ -40,20 +49,12 @@ namespace CML.Bot
             Console.WriteLine(log.ToString());
             return Task.CompletedTask;
         }*/
-        
+
         private Task ReadyAsync()
         {
-            Console.WriteLine($"Ready and logged in as {_client.CurrentUser}");
+            if (Client == null) return Task.FromException(new Exception("Discord client is null."));
+            Console.WriteLine($"Ready and logged in as {Client.CurrentUser}");
             return Task.CompletedTask;
-        }
-        
-        private async Task MessageReceivedAsync(SocketMessage message)
-        {
-            if (message.Author.Id == _client.CurrentUser.Id)
-                return;
-
-            if (message.Channel.Id.Equals(654157597389225985) && message.Content.ToLower() == "!ping")
-                await message.Channel.SendMessageAsync("Pong!");
         }
     }
 }

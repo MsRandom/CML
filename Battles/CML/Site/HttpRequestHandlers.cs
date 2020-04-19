@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
+using HttpMultipartParser;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -13,104 +13,64 @@ namespace CML.Site
 {
     public sealed class HttpRequestHandlers
     {
+        private readonly Dictionary<string, HttpPath> _paths = new Dictionary<string, HttpPath>();
         private readonly HttpPath _index = new HttpPath();
-
-        public HttpRequestHandlers(FileInfo endpoints)
+        
+        public HttpRequestHandlers()
         {
-            var obj = JsonDocument.Parse(endpoints.OpenText().ReadToEnd());
-            var dir = new DirectoryInfo(Program.ParsedArgs["wwwroot"] + "/");
-            var types = new[] {"endpoint", "auth"};
-            Fill(_index, obj.RootElement);
-            Link(_index, dir);
+            SetupLocations();
+            AssignEndpoints();
+        }
 
-            void Fill(HttpPath parent, JsonElement container)
-            {
-                var http = new HttpPath();
-                foreach (var prop in container.EnumerateObject())
-                {
-                    if (types.Contains(prop.Name))
-                    {
-                        parent.Flags.Add(prop.Name);
-                        continue;
-                    }
-
-                    parent.Children[prop.Name] = http;
-                    Fill(http, prop.Value);
-                }
-            }
-
-            void Link(HttpPath path, DirectoryInfo baseDir)
+        public void SetupLocations()
+        {
+            _paths.Clear();
+            Link(_index, new DirectoryInfo(Program.Config.SiteRoot));
+            
+            static void Link(HttpPath path, DirectoryInfo baseDir)
             {
                 foreach (var file in baseDir.EnumerateFiles())
                 {
-                    var lower = file.Name.ToLower();
-                    var end = ".html";
-                    if (!lower.EndsWith(end)) continue;
-                    var http = new HttpPath();
-                    var authEnd = ".oa" + end; 
-                    http.Flags.Add("path");
-                    if (lower.EndsWith(authEnd))
+                    const string end = ".html";
+                    const string authEnd = ".oa" + end;
+                    var http = new HttpPath
                     {
-                        end = authEnd;
-                        http.Flags.Add("auth");
-                    }
-
-                    http.Data = file.OpenText().ReadToEnd();
-                    path.Children[file.Name.Replace(end, "")] = http;
+                        Auth = file.Name.ToLower().EndsWith(authEnd),
+                        ContentType = MimeTypes.GetMimeType(file.Name),
+                        Data = File.ReadAllBytes(file.FullName)
+                    };
+                    path.Children[file.Name.Replace(authEnd, "").Replace(end, "")] = http;
                 }
 
                 foreach (var inner in baseDir.EnumerateDirectories()) Link(path.Children.ContainsKey(inner.Name) ? path.Children[inner.Name] : path.Children[inner.Name] = new HttpPath(), inner);
             }
-
-            var favicon = new HttpPath();
-            const string name = nameof(favicon) + ".ico";
-            favicon.Flags.Add(name);
-            favicon.Data = File.ReadAllBytes(Program.ParsedArgs["wwwroot"] + "/" + name);
-            _index.Children[name] = favicon;
-            AssignEndpoints();
         }
 
         private void AssignEndpoints()
         {
-            SetEndpoint("validateToken", (s, o) =>
+            //Uses reflection to get the "public static JContainer x(HttpListenerRequest req, string s, dynamic o, bool auth = true)" methods of EndpointHandlers and assigns them to endpoints using their names, the auth parameter can be omitted to make authentication not required   
+            var methods = typeof(EndpointHandlers).GetMethods(BindingFlags.Static | BindingFlags.Public);
+            foreach (var method in methods)
             {
-                dynamic res = new JObject();
-                res.valid = o.token == Program.ParsedArgs["token"];
-                return res.ToString();
-            });
-            SetEndpoint("getBattles", (s, o) =>
-            {
-                dynamic res = new JObject();
-                res.contestants = new JArray();
-                res.battles = new JArray();
-                foreach (var submission in Program.Matches.Submissions) res.contestants.Add(submission);
-                foreach (var (item1, item2) in Program.Matches.Battles)
-                {
-                    dynamic obj = new JObject();
-                    obj.item1 = item1;
-                    obj.item2 = item2;
-                    res.battles.Add(obj);
-                }
-                return res.ToString();
-            });
-            SetEndpoint("submit", (s, o) =>
-            {
-                dynamic res = new JObject();
-                if (o.speed + o.attack + o.defence <= 100)
-                {
-                    Program.Matches.Submissions.Add(o);
-                    res.success = true;
-                }
-                else res.success = false;
-                return res.ToString();
-            });
+                JContainer Action(HttpListenerRequest r, string s, dynamic o) => (method.GetParameters().Length == 4 ? method.Invoke(null, new []{ r, s, o, true }) : method.Invoke(null, new []{ r, s, o })) as JContainer;
+                SetEndpoint(method.Name, Action, method.GetParameters().Length == 4);
+            }
         }
         
-        private void SetEndpoint(string name, Func<string, dynamic, string> action)
+        private void SetEndpoint(string name, Func<HttpListenerRequest, string, dynamic, JContainer> action, bool auth = false)
         {
             var path = _index;
-            foreach (var s in name.Split('/')) if (path.Children.ContainsKey(s)) path = path.Children[s];
-            path.Data = action;
+            foreach (var s in name.Split("0"))
+            {
+                var n = s.Substring(0, 1).ToLower() + s.Substring(1);
+                if (path.Children.ContainsKey(n)) path = path.Children[n];
+                else
+                    path = path.Children[n] = new HttpPath
+                    {
+                        Auth = auth,
+                    };
+            }
+            path.Handler = action;
         }
 
         public async Task HandleRequest(HttpListenerRequest req, HttpListenerResponse resp)
@@ -125,27 +85,62 @@ namespace CML.Site
                 return;
             }
 
-            if (path.Flags.Contains("auth"))
+            if (path.Data != null)
             {
-                if (req.Headers["Authorization"] == Program.ParsedArgs["token"]) await Handle();
-                else await ReturnError(resp, "Unauthorized", 401, "Must provide valid token");
-            }
-            else await Handle();
-
-            async Task Handle()
-            {
-                if (path.Flags.Contains("path")) WriteString(resp, path.Data, "html");
-                else if (path.Flags.Contains("endpoint"))
+                var idCookie = req.Cookies["Client-Token"];
+                var index = idCookie?.Value.IndexOf("/", StringComparison.Ordinal);
+                var id = idCookie == null || index <= 0 ? Guid.Empty : Guid.Parse(idCookie.Value.Substring(0, index.Value));
+                var auth = path.Auth && id != Guid.Empty && EndpointHandlers.Authorized.Contains(id);
+                if (!path.Auth || auth)
                 {
-                    dynamic body = null;
-                    if(req.HttpMethod == "POST") body = JsonConvert.DeserializeObject<dynamic>(new StreamReader(req.InputStream).ReadToEnd());
-                    await WriteString(resp, path.Data(url.Query, body));
+                    if (auth) EndpointHandlers.Authorized.Remove(id);
+                    await WriteBytes(resp, path.Data, path.ContentType);
                 }
-                else if (path.Flags.Contains("favicon.ico")) WriteBytes(resp, path.Data, "image/ico");
-                else await NotFound(resp);
+                else await ReturnError(resp, "Unauthorized", 401, "Must have valid auth from the validateToken POST endpoint");
             }
+            else if (path.Handler != null)
+            {
+                try
+                {
+                    var a = req.Headers["Authorization"];
+                    if (!path.Auth || req.Headers["Authorization"] == Program.Config.DiscordToken)
+                    {
+                        dynamic body = null;
+                        if (req.HttpMethod != "GET")
+                        {
+                            if (req.ContentType == "application/json") body = JsonConvert.DeserializeObject<dynamic>(new StreamReader(req.InputStream).ReadToEnd());
+                            else
+                            {
+                                var dict = new Dictionary<string, object>();
+                                var parser = new StreamingMultipartFormDataParser(req.InputStream)
+                                {
+                                    ParameterHandler = part =>
+                                    {
+                                        if (!dict.ContainsKey(part.Name)) dict[part.Name] = part.Data;
+                                    },
+                                    FileHandler = (name, fileName, type, disposition, buffer, bytes, number) =>
+                                    {
+                                        if (!dict.ContainsKey(name)) dict[name] = (fileName, bytes);
+                                    }
+                                };
+                                await parser.RunAsync();
+                                body = dict;
+                            }
+                        }
 
-            async Task NotFound(HttpListenerResponse r)
+                        await WriteJson(resp, path.Handler(req, url.Query, body));
+                    }
+                    else await ReturnError(resp, "Unauthorized", 401, "Must provide valid token");
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e);
+                }
+            }
+            else await NotFound(resp);
+
+
+            static async Task NotFound(HttpListenerResponse r)
             {
                 await ReturnError(r, "Not found", 404, "The page you were looking for does not exist");
             }
@@ -153,22 +148,21 @@ namespace CML.Site
 
         private static async Task ReturnError(HttpListenerResponse resp, string error, int status, string message)
         {
-            await WriteString(resp, GenerateError(error, status, message));
+            await WriteJson(resp, GenerateError(error, status, message));
         }
 
-        private static string GenerateError(string error, int status, string message)
+        private static JContainer GenerateError(string error, int status, string message)
         {
             dynamic body = new JObject();
             body.error = error;
             body.status = status;
             body.message = message;
-            return body.ToString();
+            return body;
         }
 
-        private static async Task WriteString(HttpListenerResponse resp, string response, string type = "json")
+        private static async Task WriteJson(HttpListenerResponse resp, JContainer response)
         {
-            var data = Encoding.UTF8.GetBytes(response);
-            await WriteBytes(resp, data, "text/" + type);
+            await WriteBytes(resp, Encoding.UTF8.GetBytes(response == null ? "{}" : response.ToString()), "application/json");
         }
         
         private static async Task WriteBytes(HttpListenerResponse resp, byte[] data, string type)
@@ -180,29 +174,46 @@ namespace CML.Site
             resp.Close();
         }
 
-        private HttpPath Parse(params string[] segments)
+        private HttpPath Parse(string[] segments, bool noRetry = false)
         {
+            var path = string.Join("", segments);
+            if (_paths.ContainsKey(path)) return _paths[path];
             HttpPath current = null;
             foreach (var dir in segments)
             {
                 if (dir == "/") current = _index;
                 else if (current != null)
                 {
-                    var child = dir.Replace("/", "");
+                    var child = dir.Replace("/", "").Replace(".html", "").Replace(".oa", "");
                     if(current.Children.ContainsKey(child)) current = current.Children[child];
                     else return null;
                 }
                 else return null;
             }
             
-            return current == _index ? current?.Children["index"] : current;
+            var parsed = current == _index ? current?.Children["index"] : current;
+            if (!noRetry && parsed == null)
+            {
+                SetupLocations();
+                var newEndpoint = Parse(segments, true);
+                if (newEndpoint != null)
+                {
+                    _paths[path] = newEndpoint;
+                    return newEndpoint;
+                } 
+            }
+
+            _paths[path] = parsed;
+            return parsed;
         }
         
         private sealed class HttpPath
         {
             public readonly Dictionary<string, HttpPath> Children = new Dictionary<string, HttpPath>();
-            public readonly List<string> Flags = new List<string>();
-            public dynamic Data;
+            public bool Auth;
+            public string ContentType;
+            public byte[] Data;
+            public Func<HttpListenerRequest, string, dynamic, JContainer> Handler;
         }
     }
 }

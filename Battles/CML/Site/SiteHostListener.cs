@@ -1,7 +1,7 @@
 using System;
-using System.IO;
+using System.Linq;
 using System.Net;
-using System.Text;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace CML.Site
@@ -10,23 +10,23 @@ namespace CML.Site
     {
         private HttpListener _listener;
         private readonly HttpRequestHandlers _handler;
-        private readonly string _url;
+        private readonly int _port;
         private bool _listening;
 
-        public SiteHostListener(string url)
+        public SiteHostListener(int port)
         {
-            _handler = new HttpRequestHandlers(new FileInfo(Program.ParsedArgs["wwwroot"] + "/endpoints.json"));
-            _url = url;
+            _handler = new HttpRequestHandlers();
+            _port = port;
         }
         
-        private void HandleConnections(IAsyncResult result)
+        private async void HandleConnections()
         {
-            Task.Run(async () =>
+            await Task.Run(async () =>
             {
                 while (_listening)
                 {
-                    var ctx = _listener.EndGetContext(result);
-                    _listener.BeginGetContext(HandleConnections, null);
+                    if (_listener == null) continue;
+                    var ctx = await _listener.GetContextAsync();
                     var req = ctx.Request;
                     var resp = ctx.Response;
                     await _handler.HandleRequest(req, resp);
@@ -34,20 +34,29 @@ namespace CML.Site
             });
         }
 
+        public void Refresh()
+        {
+            _handler.SetupLocations();
+        }
+
         public override void Listen()
         {
             _listener = new HttpListener();
-            _listener.Prefixes.Add(_url);
+            _listener.Prefixes.Add($"http://*:{_port}/");
             _listener.Start();
-            _listener.BeginGetContext(HandleConnections, null);
             _listening = true;
-            Console.WriteLine("Listening to connections on " + _url);
+            HandleConnections();
+            Console.WriteLine("Listening to connections");
         }
 
         public override void Close()
         {
-            _listener.Close();
-            _listener.Prefixes.Clear();
+            if (_listener != null)
+            {
+                _listener.Close();
+                _listener.Prefixes.Clear();
+            }
+
             _listener = null;
             _listening = false;
             Console.WriteLine("Site listener has been stopped.");

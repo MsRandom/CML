@@ -8,6 +8,20 @@
 
     <ItemGroup>
       <PackageReference Include="Discord.Net" Version="2.1.1" />
+      <PackageReference Include="HttpMultipartParser" Version="4.2.0" />
+      <PackageReference Include="MimeTypes" Version="1.1.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="Site\wwwroot\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Remove="Site\wwwroot\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Site\wwwroot\**" />
     </ItemGroup>
 
 </Project>

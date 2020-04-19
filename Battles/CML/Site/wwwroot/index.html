@@ -1,49 +1,100 @@
 <!DOCTYPE html>
+<!--suppress HtmlUnknownTarget, JSUnresolvedVariable -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Home</title>
+    <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body>
-<script>
-    function openMatches() {
-        document.querySelector("#matches").setAttribute("hidden", "hidden");
-        document.querySelector("#submits").setAttribute("hidden", "hidden");
-        document.querySelector("#control").removeAttribute("hidden");
-        document.querySelector("#cancel").removeAttribute("hidden");
-        document.querySelector("#token").removeAttribute("hidden");
-    }
+<img id="logo" src="assets/header.png" alt="CML">
+<div id="menu-button" onclick="openMenu()" class="div-button">
+    <div></div>
+</div>
+<div id="main-container">
+    <button id="matches" onclick="openMatches()">Matches</button>
+    <button id="submits" onclick="location.href = 'battles/submit'">
+        <a href="battles/submit">Submit</a>
+    </button>
+    <label hidden id="token">
+        <span hidden id="error">Token is invalid.</span>
+        <br>
+        Please enter Admin token:
+        <input type="text"/>
+    </label>
+    <button hidden id="control" onclick="openControls()">Submit</button>
+    <button hidden id="cancel" onclick="closeMatches()">Cancel</button>
+    <div id="menu">
+        <div id="close-menu" class="div-button" onclick="closeMenu()"></div>
+        <div class="menu-option" onclick="closeMenu(); openMatches();">Matches</div>
+        <div class="menu-option" onclick="location.href = 'battles/submit'">
+            <a href="battles/submit">Submit</a>
+        </div>
+        <div class="menu-option" onclick="location.href = 'battles/fame'">
+            <a href="battles/fame">Hall of Fame</a>
+        </div>
+    </div>
+    <script>
+        function openMatches() {
+            document.querySelector("#matches").setAttribute("hidden", "hidden");
+            document.querySelector("#submits").setAttribute("hidden", "hidden");
+            document.querySelector("#control").removeAttribute("hidden");
+            document.querySelector("#cancel").removeAttribute("hidden");
+            document.querySelector("#token").removeAttribute("hidden");
+        }
 
-    function closeMatches() {
-        document.querySelector("#matches").removeAttribute("hidden");
-        document.querySelector("#submits").removeAttribute("hidden");
-        document.querySelector("#control").setAttribute("hidden", "hidden");
-        document.querySelector("#cancel").setAttribute("hidden", "hidden");
-        document.querySelector("#token").setAttribute("hidden", "hidden");
-        document.querySelector("#error").setAttribute("hidden", "hidden");
-    }
-    
-    async function openControls() {
-        const resp = await fetch("validateToken", {
-            method: "post",
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({token: document.querySelector("#token").firstElementChild.value})
+        function closeMatches() {
+            document.querySelector("#matches").removeAttribute("hidden");
+            document.querySelector("#submits").removeAttribute("hidden");
+            document.querySelector("#control").setAttribute("hidden", "hidden");
+            document.querySelector("#cancel").setAttribute("hidden", "hidden");
+            document.querySelector("#token").setAttribute("hidden", "hidden");
+            document.querySelector("#error").setAttribute("hidden", "hidden");
+        }
+
+        async function openControls() {
+            let resp = await fetch("getClientToken", {
+                method: "get",
+                headers: {
+                    "Content-Type": "application/json",
+                }
+            });
+            let result = await resp.json();
+            const clientToken = result.token;
+            const element = document.querySelector("#token");
+            const token = element.lastElementChild.value;
+            resp = await fetch("validateToken", {
+                method: "post",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Client-Token": clientToken
+                },
+                body: JSON.stringify({token})
+            });
+            result = await resp.json();
+            if (result.valid) {
+                const time = new Date();
+                time.setHours(time.getHours() + 2);
+                document.cookie = "Client-Token=" + clientToken + "/" + token + ";expires=" + time;
+                location.href = "battles/matches"
+            } else {
+                document.querySelector("#error").removeAttribute("hidden");
+                element.lastElementChild.style.backgroundColor = "#ff594d";
+            }
+        }
+
+        document.querySelector("#token").lastElementChild.addEventListener("keypress", e => {
+            if (e.code === "Enter") openControls();
         });
-        const result = await resp.json();
-        if(result.valid) location.replace("battles/matches");
-        else document.querySelector("#error").removeAttribute("hidden");
-    }
-</script>
-<button id="matches" onclick="openMatches()">Matches</button>
-<button id="submits" onclick="location.replace('battles/submit')">Submit</button>
-<span hidden id="error" style="color: red; font-weight: bold">Token is invalid.</span>
-<label hidden id="token">
-    Please enter Admin token:
-    <input type="text"/>
-</label>
-<button hidden id="control" onclick="openControls()">Submit</button>
-<button hidden id="cancel" onclick="closeMatches()">Cancel</button>
+
+        function openMenu() {
+            document.querySelector("#menu").style.width = "15%";
+        }
+
+        function closeMenu() {
+            document.querySelector("#menu").style.width = "0";
+        }
+    </script>
+</div>
 </body>
 </html>
