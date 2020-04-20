@@ -1,5 +1,5 @@
 body {
-    background: url("background.png") repeat scroll 0 0 transparent;
+    background: url("images/background.png") repeat scroll 0 0 transparent;
     z-index: -1;
 }
 
@@ -18,7 +18,7 @@ body {
 }
 
 button {
-    background: red url("button.png") repeat scroll 0 0;
+    background: red url("images/button.png") repeat scroll 0 0;
     padding: 15px 25px;
     font-size: 24px;
     text-align: center;
@@ -51,7 +51,7 @@ button:active {
 }
 
 #matches {
-    background: url("button_blue.png") repeat scroll 0 0 transparent;
+    background: url("images/button_blue.png") repeat scroll 0 0 transparent;
     grid-column-start: 4;
     grid-column-end: 5;
 }
@@ -75,7 +75,7 @@ button:active {
 }
 
 #submits {
-    background: url("button_red.png") repeat scroll 0 0 transparent;
+    background: url("images/button_red.png") repeat scroll 0 0 transparent;
     grid-column-start: 5;
     grid-column-end: 6;
 }

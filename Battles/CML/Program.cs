@@ -24,6 +24,7 @@ namespace CML
             else
                 config = nameof(config) + ".json";
             Config = JsonConvert.DeserializeObject<CmlConfig>(new FileInfo(config).OpenText().ReadToEnd());
+            
             Startup.Run();
             ActiveListeners.ForEach(l => l.Listen());
             await Task.Delay(-1);

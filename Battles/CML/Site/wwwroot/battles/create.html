@@ -80,18 +80,11 @@
         <a href="fame">Hall of Fame</a>
     </div>
 </div>
+<script src="../assets/js/dropdown.js"></script>
 <script>
     let mainContainer;
     let loginId;
     let loginPassword;
-
-    function openMenu() {
-        document.querySelector("#menu").style.width = "15%";
-    }
-
-    function closeMenu() {
-        document.querySelector("#menu").style.width = "0";
-    }
 
     async function login() {
         const response = document.querySelector("#login-response");
@@ -129,100 +122,6 @@
 
     function testKey(event) {
         if (event.code === "Enter") login();
-    }
-
-    function showUsers() {
-        document.querySelector("#users").removeAttribute("hidden");
-    }
-
-    function hideUsers() {
-        document.querySelector("#users").setAttribute("hidden", "hidden");
-    }
-
-    function filterUsers(event) {
-        if (event.code !== "Enter") {
-            const input = document.querySelector("#user-filter");
-            const div = document.querySelector("#users");
-            const users = div.querySelectorAll("#users div");
-            const text = input.value + event.key;
-            users.forEach(user => {
-                if (!user.innerHTML.includes("Username") && (!text || user.className.includes("selected") || user.innerHTML.toLowerCase().includes(text.toLowerCase())))
-                    user.style.display = "block";
-                else
-                    user.style.display = "none";
-            });
-        }
-    }
-
-    function keyControl(e) {
-        const element = document.querySelector("#users");
-        if (!element.hidden) {
-            const filter = document.querySelector("#user-filter");
-            if (e.code === "ArrowDown") {
-                let index = indexOfChild(element);
-                if (index < element.childNodes.length - 1) {
-                    setSelected(element, filter, element.childNodes[index + (index === 0 ? 2 : 1)], element.childNodes[index]);
-                }
-            } else if (e.code === "ArrowUp") {
-                let index = indexOfChild(element);
-                if (index > 2) {
-                    setSelected(element, filter, element.childNodes[index - 1], element.childNodes[index]);
-                }
-            } else if (e.code === "Enter") {
-                hideUsers()
-            }
-        }
-    }
-
-    function indexOfChild(users) {
-        for (let i = 0; i < users.childNodes.length; i++) {
-            if (users.childNodes[i].className && users.childNodes[i].className.includes("selected")) return i;
-        }
-        return -1;
-    }
-
-    function setSelected(element, filter, child, old) {
-        if (old) {
-            old.className = "";
-        } else {
-            if (element.className) document.getElementById(element.className).className = "";
-            else element.firstElementChild.className = "";
-        }
-        if (child.id) {
-            element.className = child.id;
-            filter.placeholder = child.innerHTML;
-        }
-        filter.value = "";
-        child.className = "selected";
-    }
-
-    async function setUsers() {
-        const filter = document.querySelector("#user-filter");
-        const element = document.querySelector("#users");
-        const container = document.querySelector("#create-container");
-        document.querySelector("#login-container").addEventListener("keypress", testKey);
-        filter.addEventListener("keypress", filterUsers);
-        container.addEventListener("keyup", keyControl);
-        mainContainer = container;
-        document.body.removeChild(mainContainer);
-        const resp = await fetch("getUsers", {
-            method: "get",
-            headers: {
-                "Content-Type": "application/json"
-            }
-        });
-        const result = await resp.json();
-        result.sort((a, b) => a.name > b.name ? 1 : a.name < b.name ? -1 : 0);
-        for (const user of result) {
-            const child = document.createElement("DIV");
-            child.id = user.user;
-            child.innerHTML = user.name;
-            child.addEventListener("click", () => {
-                setSelected(element, filter, child);
-                hideUsers();
-            });
-            element.appendChild(child);
-        }
     }
 
     async function updateUser() {
@@ -280,7 +179,12 @@
         location.href = "submit";
     }
 
-    setUsers();
+    document.querySelector("#login-container").addEventListener("keypress", testKey);
+    mainContainer = document.querySelector("#create-container");
+    document.body.removeChild(mainContainer);
+
+    setUsers(mainContainer);
 </script>
+<script src="../assets/js/menu.js"></script>
 </body>
 </html>
