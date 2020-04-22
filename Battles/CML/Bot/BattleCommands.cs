@@ -156,9 +156,10 @@ namespace CML.Bot
                 if (property == null) return fallback();
                 var left = (int) (property.GetValue(submissionLeft) ?? 0);
                 var right = (int) (property.GetValue(submissionRight) ?? 0);
-                return left > right ? flipped ? _leftContestant :
-                    _rightContestant :
-                    left < right ? flipped ? _rightContestant : _leftContestant : fallback();
+                var r = flipped ? _leftContestant : _rightContestant;
+                var l = flipped ? _rightContestant : _leftContestant;
+                return left > right ? r :
+                    left < right ? l : fallback();
 
             }
 
@@ -240,9 +241,10 @@ namespace CML.Bot
             var other = Other;
             var attacker = _next.Submission;
             var defender = other.Submission;
-            var damage = attacker.Attack * (defender.Defense / 100);
             var bonus = attacker.Element.HasAdvantage(defender.Element) ? attacker.Attack / 6 : 0;
-            other.Defense -= other.Defense - damage <= 0 ? 0 : damage;
+            var damage = attacker.Attack * (defender.Defense / 100) + bonus;
+            if (other.Defense - damage <= 0) other.Defense = 0;
+            else other.Defense -= damage;
             other.Health -= damage;
             await channel.SendMessageAsync(other.Health > 0
                 ? $"{attacker.Name} attacked{(bonus != 0 ? " with an elemental advantage " : " ")}and dealt {damage} damage, {defender.Name} is now at {other.Health}HP!"
@@ -260,7 +262,7 @@ namespace CML.Bot
                     var role = Context.Guild.GetRole(Program.Config.Guild);
                     foreach (var submission in Program.Matches.Submissions.Values)
                         await Context.Guild.GetUser(submission.Owner).RemoveRoleAsync(role);
-                    Program.Matches.Submissions.Clear();
+                    //Program.Matches.Submissions.Clear();
                     Program.Matches.InBattle = false;
                     var votes = Context.Guild.GetTextChannel(Program.Config.VotesChannel);
                     if (votes != null) await votes.DeleteMessagesAsync(CommandHandler.VoteMessages.Keys);
