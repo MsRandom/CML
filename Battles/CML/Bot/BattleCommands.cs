@@ -108,8 +108,8 @@ namespace CML.Bot
                         {
                             if (a.Item2 > b.Item2) return a;
                             if (b.Item2 > a.Item2) return b;
-                            var aInt = (int) emoteToProperty[a.Item1].GetValue(CommandHandler.VoteMessages[msg]);
-                            var bInt = (int) emoteToProperty[b.Item1].GetValue(CommandHandler.VoteMessages[msg]);
+                            var aInt = (int) (emoteToProperty[a.Item1].GetValue(CommandHandler.VoteMessages[msg]) ?? 0);
+                            var bInt = (int) (emoteToProperty[b.Item1].GetValue(CommandHandler.VoteMessages[msg]) ?? 0);
                             if (aInt < bInt) return a;
                             return aInt > bInt ? b : a;
                         });
@@ -121,7 +121,7 @@ namespace CML.Bot
                     {
                         var property = emoteToProperty[type];
                         var entry = CommandHandler.VoteMessages[message];
-                        property.SetValue(entry, (int) property.GetValue(entry) + additions);
+                        property.SetValue(entry, (int) (property.GetValue(entry) ?? 0) + additions);
                         additions -= 2;
                     }
                 }
@@ -154,8 +154,8 @@ namespace CML.Bot
             {
                 var property = typeof(Submission).GetProperty(name);
                 if (property == null) return fallback();
-                var left = (int) property.GetValue(submissionLeft);
-                var right = (int) property.GetValue(submissionRight);
+                var left = (int) (property.GetValue(submissionLeft) ?? 0);
+                var right = (int) (property.GetValue(submissionRight) ?? 0);
                 return left > right ? flipped ? _leftContestant :
                     _rightContestant :
                     left < right ? flipped ? _rightContestant : _leftContestant : fallback();
@@ -237,64 +237,56 @@ namespace CML.Bot
 
         private async Task PerformAttack(ISocketMessageChannel channel)
         {
-            try
+            var other = Other;
+            var attacker = _next.Submission;
+            var defender = other.Submission;
+            var damage = attacker.Attack * (defender.Defense / 100);
+            var bonus = attacker.Element.HasAdvantage(defender.Element) ? attacker.Attack / 6 : 0;
+            other.Defense -= other.Defense - damage <= 0 ? 0 : damage;
+            other.Health -= damage;
+            await channel.SendMessageAsync(other.Health > 0
+                ? $"{attacker.Name} attacked{(bonus != 0 ? " with an elemental advantage " : " ")}and dealt {damage} damage, {defender.Name} is now at {other.Health}HP!"
+                : $"{attacker.Name} dealt the final blow, {defender.Name} is now at 0HP!");
+            if (other.Health <= 0)
             {
-                var other = Other;
-                var attacker = _next.Submission;
-                var defender = other.Submission;
-                var bonus = attacker.Element.HasAdvantage(defender.Element);
-                var damage = Math.Min(Convert.ToInt32(attacker.Attack * (20.0 / other.Defense)), attacker.Attack);
-                if (bonus) damage += damage / 6;
-                other.Defense -= other.Defense - damage <= 0 ? 0 : damage;
-                other.Health -= damage;
-                await channel.SendMessageAsync(other.Health > 0 
-                    ? $"{attacker.Name} attacked{(bonus ? " with an elemental advantage " : " ")}and dealt {damage} damage, {defender.Name} is now at {other.Health}HP!"
-                    : $"{attacker.Name} dealt the final blow, {defender.Name} is now at 0HP!");
-                if (other.Health <= 0)
+                await channel.SendMessageAsync($"{attacker.Name} defeated {defender.Name}, {attacker.Name} wins!");
+                if (Program.Matches.Battles.Count == 0 && _currentWinners.Item1 == Guid.Empty)
                 {
-                    await channel.SendMessageAsync($"{attacker.Name} defeated {defender.Name}, {attacker.Name} wins!");
-                    if (Program.Matches.Battles.Count == 0 && _currentWinners.Item1 == Guid.Empty)
-                    {
-                        await channel.SendMessageAsync(
-                            $"{_next.User.Mention} wins this week! {attacker.Name} will be added to the mod.");
-                        await Context.Guild.GetTextChannel(Program.Config.AnnouncementsChannel)
-                            .SendMessageAsync("Applications are now open!");
-                        attacker.IsWinner = true;
-                        var role = Context.Guild.GetRole(Program.Config.Guild);
-                        foreach (var submission in Program.Matches.Submissions.Values) 
-                            await Context.Guild.GetUser(submission.Owner).RemoveRoleAsync(role);
-                        Program.Matches.Submissions.Clear();
-                        Program.Matches.InBattle = false;
-                        var votes = Context.Guild.GetTextChannel(Program.Config.VotesChannel);
-                        if (votes != null) await votes.DeleteMessagesAsync(CommandHandler.VoteMessages.Keys);
-                        CommandHandler.VoteMessages.Clear();
-                        await Program.Matches.UpdateContestants();
-                        await Program.Matches.UpdateHoF();
-                        Program.Listener.Refresh();
-                    }
-                    else if (_currentWinners.Item1 == Guid.Empty) _currentWinners.Item1 = _next.Id;
-                    else if (_currentWinners.Item2 == Guid.Empty)
-                    {
-                        _currentWinners.Item2 = _next.Id;
-                        Program.Matches.Battles.Add(_currentWinners);
-                        _currentWinners = (Guid.Empty, Guid.Empty);
-                    }
-
-                    EndBattle();
-                    await Program.Matches.UpdateBattles();
-                    return;
+                    await channel.SendMessageAsync(
+                        $"{_next.User.Mention} wins this week! {attacker.Name} will be added to the mod.");
+                    await Context.Guild.GetTextChannel(Program.Config.AnnouncementsChannel)
+                        .SendMessageAsync("Applications are now open!");
+                    attacker.IsWinner = true;
+                    var role = Context.Guild.GetRole(Program.Config.Guild);
+                    foreach (var submission in Program.Matches.Submissions.Values)
+                        await Context.Guild.GetUser(submission.Owner).RemoveRoleAsync(role);
+                    Program.Matches.Submissions.Clear();
+                    Program.Matches.InBattle = false;
+                    var votes = Context.Guild.GetTextChannel(Program.Config.VotesChannel);
+                    if (votes != null) await votes.DeleteMessagesAsync(CommandHandler.VoteMessages.Keys);
+                    CommandHandler.VoteMessages.Clear();
+                    await Program.Matches.UpdateContestants();
+                    await Program.Matches.UpdateHoF();
+                    Program.Listener.Refresh();
+                }
+                else if (_currentWinners.Item1 == Guid.Empty) _currentWinners.Item1 = _next.Id;
+                else if (_currentWinners.Item2 == Guid.Empty)
+                {
+                    _currentWinners.Item2 = _next.Id;
+                    Program.Matches.Battles.Add(_currentWinners);
+                    _currentWinners = (Guid.Empty, Guid.Empty);
                 }
 
-                if (_bonusTurns-- <= 0) _next = other;
-                await CheckNext(channel,
-                    async () => await channel.SendMessageAsync($"It's {_next.User.Mention}'s turn!"));
+                EndBattle();
+                await Program.Matches.UpdateBattles();
+                return;
             }
-            catch (Exception e)
-            {
-                Console.Error.WriteLine(e);
-            }
+
+            if (_bonusTurns-- <= 0) _next = other;
+            await CheckNext(channel,
+                async () => await channel.SendMessageAsync($"It's {_next.User.Mention}'s turn!"));
         }
-        
+
         private static void EndBattle()
         {
             _leftContestant = null;
